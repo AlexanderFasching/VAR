@@ -52,6 +52,7 @@ let targetMeshName = meshNames[Math.floor(Math.random() * meshNames.length)];
 let targetMesh = null;
 let allMeshes = null;
 let worldMap = null;
+let arrow = null;
 let isRotating = true;
 
 const loader = new GLTFLoader();
@@ -86,6 +87,35 @@ loader.load(
     });
 
     scene.add(worldMap);
+  },
+  (xhr) => {
+    console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+  },
+  (error) => {
+    console.error("An error occurred:", error);
+  }
+);
+
+// Load arrow
+loader.load(
+  "assets/jumpboost_arrow/scene.gltf",
+  (gltf) => {
+    console.log(gltf);
+    arrow = gltf.scene;
+    arrow.position.set(1, 0, 0.5);
+    arrow.rotation.set(Math.PI / 2, 0, Math.PI / -3);
+    arrow.scale.set(0.0012, 0.0012, 0.0012);
+
+    // Traverse all the meshes in the arrow model and change their color to blue
+    arrow.traverse((child) => {
+      if (child.isMesh) {
+        child.material.color.set(0x0077ff); // Set color to blue (0x0000ff is the hex color code for blue)
+        child.material.transparent = true; // Enable transparency
+        child.material.opacity = 0.5;
+      }
+    });
+
+    scene.add(arrow);
   },
   (xhr) => {
     console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
@@ -161,7 +191,7 @@ const uiContainer = document.createElement("div");
 uiContainer.style.position = "absolute";
 uiContainer.style.pointerEvents = "auto"; // Allow interaction with UI
 uiContainer.style.zIndex = "10"; // Ensure it's above the canvas
-uiContainer.style.fontSize = "20px";
+uiContainer.style.fontSize = "16px";
 uiContainer.style.color = "#000";
 uiContainer.style.padding = "10px";
 uiContainer.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
@@ -169,7 +199,7 @@ uiContainer.style.borderRadius = "8px";
 uiContainer.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
 uiContainer.style.display = "flex"; // Use flexbox to stack elements
 uiContainer.style.flexDirection = "column"; // Stack elements vertically
-uiContainer.style.alignItems = "center"; // Center the elements horizontally
+uiContainer.style.alignItems = "flex-start"; // Align all elements to the left
 document.body.appendChild(uiContainer);
 
 // Create a container for the text field and submit button (horizontal layout)
@@ -181,7 +211,7 @@ uiContainer.appendChild(inputContainer);
 // Create the text input field
 const textField = document.createElement("input");
 textField.type = "text";
-textField.placeholder = "Enter text here...";
+textField.placeholder = "Enter Country";
 textField.style.width = "200px";
 textField.style.marginRight = "10px"; // Space between input and button
 inputContainer.appendChild(textField);
@@ -199,20 +229,66 @@ stopBtn.style.width = "200px";
 stopBtn.style.marginTop = "10px";
 uiContainer.appendChild(stopBtn);
 
+// Container for population and button
+const populationContainer = document.createElement("div");
+populationContainer.style.display = "flex";
+populationContainer.style.alignItems = "center";
+populationContainer.style.justifyContent = "flex-start"; // Align everything to the left
+uiContainer.appendChild(populationContainer);
+
+// Create the "Show Population" button
 const populationBtn = document.createElement("button");
 populationBtn.textContent = "[ -1 ] Show Population";
 populationBtn.style.width = "200px";
-populationBtn.style.marginTop = "10px";
-uiContainer.appendChild(populationBtn);
+populationBtn.style.marginTop = "10px"; // Optional: Adjust margin as needed
+populationContainer.appendChild(populationBtn);
 
-/*
-// Create additional UI elements as needed
-const label = document.createElement("p");
-label.textContent = "Enter your response:";
-label.style.marginTop = "0";
-label.style.marginBottom = "5px";
-uiContainer.insertBefore(label, textField); // Add label above the text field
-*/
+// Create a span to hold the population value
+const populationDisplay = document.createElement("span");
+populationDisplay.textContent = ""; // Initially empty
+populationDisplay.style.marginLeft = "10px"; // Space between the button and the population display
+populationContainer.appendChild(populationDisplay);
+
+// Container for country size
+const sizeContainer = document.createElement("div");
+sizeContainer.style.display = "flex";
+sizeContainer.style.alignItems = "center";
+sizeContainer.style.justifyContent = "flex-start"; // Align everything to the left
+uiContainer.appendChild(sizeContainer);
+
+// Create the "Show Population" button
+const sizeBtn = document.createElement("button");
+sizeBtn.textContent = "[ -1 ] Show Size";
+sizeBtn.style.width = "200px";
+sizeBtn.style.marginTop = "10px"; // Optional: Adjust margin as needed
+sizeContainer.appendChild(sizeBtn);
+
+// Create a span to hold the population value
+const sizeDisplay = document.createElement("span");
+sizeDisplay.textContent = ""; // Initially empty
+sizeDisplay.style.marginLeft = "10px"; // Space between the button and the population display
+sizeContainer.appendChild(sizeDisplay);
+
+// Create Container for Arrow
+const arrowContainer = document.createElement("div");
+arrowContainer.style.position = "absolute";
+arrowContainer.style.pointerEvents = "auto"; // Allow interaction with UI
+arrowContainer.style.zIndex = "10"; // Ensure it's above the canvas
+arrowContainer.style.fontSize = "16px";
+arrowContainer.style.color = "#000";
+arrowContainer.style.padding = "10px";
+arrowContainer.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+arrowContainer.style.borderRadius = "8px";
+arrowContainer.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+arrowContainer.style.display = "flex"; // Use flexbox to stack elements
+arrowContainer.style.flexDirection = "column"; // Stack elements vertically
+arrowContainer.style.alignItems = "flex-start"; // Align all elements to the left
+document.body.appendChild(arrowContainer);
+
+const arrowText = document.createElement("span");
+arrowText.textContent = "See all correctly guessed countries on the world map";
+arrowText.style.marginLeft = "10px";
+arrowContainer.appendChild(arrowText);
 
 // Initialize the counters
 let correctGuesses = 0;
@@ -273,6 +349,22 @@ function updateCounterPosition() {
   counterContainer.style.top = `${y + -350}px`; // Vertically aligned
 }
 
+function updateArrowTextPosition() {
+  if (arrow) {
+    const vector = new THREE.Vector3();
+    arrow.getWorldPosition(vector); // Get the world position of the backPlane
+    vector.project(camera); // Project it to screen space
+
+    // Convert to screen coordinates
+    const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+    // Adjust the counter's position (e.g., slightly to the right of the backPlane)
+    arrowContainer.style.left = `${x - 80}px`; // 50px offset to the right
+    arrowContainer.style.top = `${y + 40}px`; // Vertically aligned
+  }
+}
+
 // Disable key events while typing
 textField.addEventListener("focus", () => {
   isTyping = true; // User is typing
@@ -315,7 +407,18 @@ populationBtn.addEventListener("click", async () => {
   const countryInfo = await fetchCountryInfo(meshToCountry[targetMeshName]);
 
   if (countryInfo) {
-    console.log("Population:", countryInfo["population"]);
+    const population = countryInfo.population;
+    populationDisplay.textContent = `Population: ${population.toLocaleString()}`;
+  }
+});
+
+// Button to show size
+sizeBtn.addEventListener("click", async () => {
+  const countryInfo = await fetchCountryInfo(meshToCountry[targetMeshName]);
+
+  if (countryInfo) {
+    const size = countryInfo.area;
+    sizeDisplay.textContent = `Area: ${size.toLocaleString()} km²`;
   }
 });
 
@@ -403,6 +506,7 @@ function animate() {
   // Update the text field position
   updateUIPosition();
   updateCounterPosition();
+  updateArrowTextPosition();
 
   renderer.render(scene, camera);
 }
