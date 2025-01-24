@@ -1,17 +1,15 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: "/VAR/", // Replace <REPOSITORY_NAME> with your GitHub repo name
+  base: "/VAR/", // Replace with your GitHub repository name
   build: {
     rollupOptions: {
-      output: {
-        manualChunks: {
-          three: ["three"], // Ensure `three` is bundled separately
-        },
-      },
+      external: [], // Ensure no dependencies are treated as external
     },
   },
-  optimizeDeps: {
-    include: ["three", "three/examples/jsm/loaders/GLTFLoader.js"], // Pre-bundle dependencies
+  resolve: {
+    alias: {
+      three: "three", // This ensures "three" is resolved properly
+    },
   },
 });
