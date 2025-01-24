@@ -29,9 +29,10 @@ document.body.appendChild(renderer.domElement);
 // Add Light
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(5, 10, 7.5);
+
 scene.add(light);
 
-// Position the camera
+// Position the cameran
 camera.position.z = 5;
 
 const loader = new GLTFLoader();
