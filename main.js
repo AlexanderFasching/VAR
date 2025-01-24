@@ -47,8 +47,9 @@ camera.position.z = 5;
 // Target mesh name
 // Randomly pick a mesh name from meshToCountry
 const meshNames = Object.keys(meshToCountry);
-const targetMeshName = meshNames[Math.floor(Math.random() * meshNames.length)];
+let targetMeshName = meshNames[Math.floor(Math.random() * meshNames.length)];
 let targetMesh = null;
+let allMeshes = null;
 
 const loader = new GLTFLoader();
 
@@ -70,28 +71,9 @@ loader.load(
     scene.add(gltf.scene);
     */
 
+    allMeshes = gltf.scene;
     // Traverse the model to find the target mesh
-    gltf.scene.traverse((child) => {
-      if (child.isMesh) {
-        if (child.name === targetMeshName) {
-          targetMesh = child;
-          targetMesh.material = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-          });
-          targetMesh.castShadow = true;
-        } else {
-          child.visible = false; // Hide other meshes
-        }
-      }
-    });
-
-    if (targetMesh) {
-      console.log("Found target mesh:", targetMesh.name);
-      targetMesh.position.set(0, 0.5, -1);
-      scene.add(targetMesh); // Add the target mesh to the scene
-    } else {
-      console.error("Target mesh not found!");
-    }
+    changeCountry();
   },
   (xhr) => {
     console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
@@ -156,34 +138,44 @@ window.addEventListener("keydown", (event) => {
 
 // Keyup event listener
 window.addEventListener("keyup", (event) => {
-  if (isTyping) return; // Ignore key events while typing
+  if (isTyping) return;
   if (["w", "a", "s", "d"].includes(event.key.toLowerCase())) {
     keys[event.key.toLowerCase()] = false;
   }
 });
 
-// Text field
-// Create an HTML text input field
+// Create a container div for all UI elements
+const uiContainer = document.createElement("div");
+uiContainer.style.position = "absolute";
+uiContainer.style.pointerEvents = "auto"; // Allow interaction with UI
+uiContainer.style.zIndex = "10"; // Ensure it's above the canvas
+document.body.appendChild(uiContainer);
+
+// Create the text input field
 const textField = document.createElement("input");
 textField.type = "text";
 textField.placeholder = "Enter text here...";
-textField.style.position = "absolute";
 textField.style.width = "200px";
-textField.style.padding = "5px";
-textField.style.fontSize = "14px";
-textField.style.zIndex = "10"; // Ensure it overlays the canvas
-document.body.appendChild(textField);
+textField.style.marginBottom = "10px"; // Add spacing between elements
+uiContainer.appendChild(textField);
 
-// Disable key events while typing
-textField.addEventListener("focus", () => {
-  isTyping = true; // User is typing
-});
-textField.addEventListener("blur", () => {
-  isTyping = false; // User has stopped typing
-});
+// Create a button below the text input field
+const button = document.createElement("button");
+button.textContent = "Submit";
+button.style.width = "200px";
+uiContainer.appendChild(button);
 
-// Function to update the position of the text field
-function updateTextFieldPosition() {
+/*
+// Create additional UI elements as needed
+const label = document.createElement("p");
+label.textContent = "Enter your response:";
+label.style.marginTop = "0";
+label.style.marginBottom = "5px";
+uiContainer.insertBefore(label, textField); // Add label above the text field
+*/
+
+// Position the UI container based on the target mesh
+function updateUIPosition() {
   if (targetMesh) {
     // Convert the targetMesh position to screen coordinates
     const vector = new THREE.Vector3();
@@ -193,10 +185,83 @@ function updateTextFieldPosition() {
     const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
     const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
 
-    // Position the text field below the targetMesh
-    textField.style.left = `${x - textField.offsetWidth / 2}px`; // Center horizontally
-    textField.style.top = `${y + 20}px`; // Adjust vertical position
+    // Position the container (adjust offsets if needed)
+    uiContainer.style.left = `${x - uiContainer.offsetWidth / 2}px`; // Center horizontally
+    uiContainer.style.top = `${y + 130}px`; // Position slightly below the targetMesh
   }
+}
+
+// Disable key events while typing
+textField.addEventListener("focus", () => {
+  isTyping = true; // User is typing
+});
+textField.addEventListener("blur", () => {
+  isTyping = false; // User has stopped typing
+});
+
+// Button click logic to check the input
+button.addEventListener("click", () => {
+  const enteredText = textField.value.trim(); // Get the entered text and remove extra spaces
+
+  // Check if the entered text matches the country for the selected target mesh
+  const correctCountry = meshToCountry[targetMeshName];
+  if (enteredText.toLowerCase() === correctCountry.toLowerCase()) {
+    console.log("Congratulations, you selected the correct country!");
+    changeCountry();
+  } else {
+    console.log("Oops! That's not the correct country.");
+  }
+
+  // Optionally, clear the text field after checking
+  textField.value = "";
+});
+
+function changeCountry() {
+  console.log(meshNames);
+
+  if (meshNames.length === 0) {
+    console.log("No more countries available!");
+    return;
+  }
+
+  // Select a random mesh name
+  const randomIndex = Math.floor(Math.random() * meshNames.length);
+  targetMeshName = meshNames[randomIndex];
+
+  // Remove the selected mesh name from the array
+  meshNames.splice(randomIndex, 1);
+
+  allMeshes.traverse((child) => {
+    if (child.isMesh) {
+      if (child.name === targetMeshName) {
+        if (targetMesh) {
+          targetMesh.visible = false;
+        }
+        targetMesh = child;
+
+        // Set material and make visible
+        targetMesh.material = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+        });
+        targetMesh.castShadow = true;
+        targetMesh.visible = true;
+
+        // Compute bounding box to center the target mesh
+        const boundingBox = new THREE.Box3().setFromObject(targetMesh);
+        const center = new THREE.Vector3();
+        boundingBox.getCenter(center);
+
+        // Adjust position to center the mesh in the scene
+        targetMesh.position.sub(center);
+        targetMesh.position.set(0, 0, 0); // Center on the scene
+        scene.add(targetMesh);
+
+        console.log("Target mesh centered:", targetMesh.name);
+      } else {
+        child.visible = false; // Hide other meshes
+      }
+    }
+  });
 }
 
 // Animation loop
@@ -221,7 +286,7 @@ function animate() {
   }
 
   // Update the text field position
-  updateTextFieldPosition();
+  updateUIPosition();
 
   renderer.render(scene, camera);
 }
