@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { fetchCountryInfo } from "./fetchCountryInfo.js";
 
 // Map countries to mesh names
 const meshToCountry = {
@@ -19,7 +20,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf0f0f0);
 
 const camera = new THREE.PerspectiveCamera(
-  15,
+  35,
   window.innerWidth / window.innerHeight,
   0.1,
   1000
@@ -34,15 +35,15 @@ document.body.appendChild(renderer.domElement);
 const light = new THREE.DirectionalLight(0xffffff, 3);
 light.position.set(2, 1.2, 7.5);
 light.castShadow = true;
-light.shadow.mapSize.width = 2048; // Increase width of shadow map
-light.shadow.mapSize.height = 2048; // Increase height of shadow map
+light.shadow.mapSize.width = 4096; // Increase width of shadow map
+light.shadow.mapSize.height = 4096; // Increase height of shadow map
 light.shadow.camera.near = 0.5; // Near clipping plane
 light.shadow.camera.far = 50; // Far clipping plane
 
 scene.add(light);
 
 // Position the cameran
-camera.position.z = 5;
+camera.position.z = 3.1;
 
 // Target mesh name
 // Randomly pick a mesh name from meshToCountry
@@ -50,6 +51,8 @@ const meshNames = Object.keys(meshToCountry);
 let targetMeshName = meshNames[Math.floor(Math.random() * meshNames.length)];
 let targetMesh = null;
 let allMeshes = null;
+let worldMap = null;
+let isRotating = true;
 
 const loader = new GLTFLoader();
 
@@ -57,23 +60,32 @@ const loader = new GLTFLoader();
 loader.load(
   "assets/worldmap/scene.gltf",
   (gltf) => {
-    // Traverse and set material for all meshes
-    /*
-    gltf.scene.traverse((child) => {
+    allMeshes = gltf.scene;
+    changeCountry();
+  },
+  (xhr) => {
+    console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+  },
+  (error) => {
+    console.error("An error occurred:", error);
+  }
+);
+
+loader.load(
+  "assets/worldmap/scene.gltf",
+  (gltf) => {
+    worldMap = gltf.scene;
+    worldMap.position.set(4, 0, 5);
+    worldMap.rotation.y = (-1 * Math.PI) / 2;
+
+    // Traverse and make all child meshes invisible
+    worldMap.traverse((child) => {
       if (child.isMesh) {
-        console.log("Mesh found:", child.name); // Debug mesh names
-        child.material = new THREE.MeshStandardMaterial({
-          color: getRandomColor(),
-        });
+        child.visible = false; // Set each mesh's visibility to false
       }
     });
-    
-    scene.add(gltf.scene);
-    */
 
-    allMeshes = gltf.scene;
-    // Traverse the model to find the target mesh
-    changeCountry();
+    scene.add(worldMap);
   },
   (xhr) => {
     console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
@@ -91,7 +103,7 @@ const backPlaneMaterial = new THREE.MeshStandardMaterial({
   opacity: 0.8,
 });
 const backPlane = new THREE.Mesh(backPlaneGeometry, backPlaneMaterial);
-backPlane.position.set(0, 0, -1.2);
+backPlane.position.set(0, 0, -0.3);
 backPlane.receiveShadow = true;
 scene.add(backPlane);
 
@@ -149,21 +161,49 @@ const uiContainer = document.createElement("div");
 uiContainer.style.position = "absolute";
 uiContainer.style.pointerEvents = "auto"; // Allow interaction with UI
 uiContainer.style.zIndex = "10"; // Ensure it's above the canvas
+uiContainer.style.fontSize = "20px";
+uiContainer.style.color = "#000";
+uiContainer.style.padding = "10px";
+uiContainer.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+uiContainer.style.borderRadius = "8px";
+uiContainer.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+uiContainer.style.display = "flex"; // Use flexbox to stack elements
+uiContainer.style.flexDirection = "column"; // Stack elements vertically
+uiContainer.style.alignItems = "center"; // Center the elements horizontally
 document.body.appendChild(uiContainer);
+
+// Create a container for the text field and submit button (horizontal layout)
+const inputContainer = document.createElement("div");
+inputContainer.style.display = "flex"; // Use flex to place input and button next to each other
+inputContainer.style.alignItems = "center"; // Vertically center input and button
+uiContainer.appendChild(inputContainer);
 
 // Create the text input field
 const textField = document.createElement("input");
 textField.type = "text";
 textField.placeholder = "Enter text here...";
 textField.style.width = "200px";
-textField.style.marginBottom = "10px"; // Add spacing between elements
-uiContainer.appendChild(textField);
+textField.style.marginRight = "10px"; // Space between input and button
+inputContainer.appendChild(textField);
 
-// Create a button below the text input field
-const button = document.createElement("button");
-button.textContent = "Submit";
-button.style.width = "200px";
-uiContainer.appendChild(button);
+// Create a button next to the text input field
+const submitBtn = document.createElement("button");
+submitBtn.textContent = "Submit";
+submitBtn.style.width = "200px";
+inputContainer.appendChild(submitBtn);
+
+// Create a button below the other elements
+const stopBtn = document.createElement("button");
+stopBtn.textContent = "[ -1 ] Align North";
+stopBtn.style.width = "200px";
+stopBtn.style.marginTop = "10px";
+uiContainer.appendChild(stopBtn);
+
+const populationBtn = document.createElement("button");
+populationBtn.textContent = "[ -1 ] Show Population";
+populationBtn.style.width = "200px";
+populationBtn.style.marginTop = "10px";
+uiContainer.appendChild(populationBtn);
 
 /*
 // Create additional UI elements as needed
@@ -173,6 +213,34 @@ label.style.marginTop = "0";
 label.style.marginBottom = "5px";
 uiContainer.insertBefore(label, textField); // Add label above the text field
 */
+
+// Initialize the counters
+let correctGuesses = 0;
+let possiblePoints = 10;
+
+// Create a container for the counters
+const counterContainer = document.createElement("div");
+counterContainer.style.position = "absolute";
+counterContainer.style.fontSize = "20px";
+counterContainer.style.color = "#000";
+counterContainer.style.padding = "10px";
+counterContainer.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+counterContainer.style.borderRadius = "8px";
+counterContainer.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+counterContainer.style.display = "flex";
+counterContainer.style.flexDirection = "column"; // Stack counters vertically
+counterContainer.style.alignItems = "center"; // Center the counters horizontally
+document.body.appendChild(counterContainer);
+
+// Create a UI element to display the correct guesses counter
+const counterDisplay = document.createElement("div");
+counterDisplay.textContent = `Correct Guesses: ${correctGuesses}`;
+counterContainer.appendChild(counterDisplay);
+
+// Create a UI element to display the incorrect guesses counter
+const possiblePointsDisplay = document.createElement("div");
+possiblePointsDisplay.textContent = `Remaining Points: ${possiblePoints}`;
+counterContainer.appendChild(possiblePointsDisplay);
 
 // Position the UI container based on the target mesh
 function updateUIPosition() {
@@ -187,8 +255,22 @@ function updateUIPosition() {
 
     // Position the container (adjust offsets if needed)
     uiContainer.style.left = `${x - uiContainer.offsetWidth / 2}px`; // Center horizontally
-    uiContainer.style.top = `${y + 130}px`; // Position slightly below the targetMesh
+    uiContainer.style.top = `${y + 170}px`; // Position slightly below the targetMesh
   }
+}
+
+function updateCounterPosition() {
+  const vector = new THREE.Vector3();
+  backPlane.getWorldPosition(vector); // Get the world position of the backPlane
+  vector.project(camera); // Project it to screen space
+
+  // Convert to screen coordinates
+  const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+  // Adjust the counter's position (e.g., slightly to the right of the backPlane)
+  counterContainer.style.left = `${x + 230}px`; // 50px offset to the right
+  counterContainer.style.top = `${y + -350}px`; // Vertically aligned
 }
 
 // Disable key events while typing
@@ -200,13 +282,17 @@ textField.addEventListener("blur", () => {
 });
 
 // Button click logic to check the input
-button.addEventListener("click", () => {
+submitBtn.addEventListener("click", () => {
   const enteredText = textField.value.trim(); // Get the entered text and remove extra spaces
 
   // Check if the entered text matches the country for the selected target mesh
   const correctCountry = meshToCountry[targetMeshName];
   if (enteredText.toLowerCase() === correctCountry.toLowerCase()) {
     console.log("Congratulations, you selected the correct country!");
+
+    correctGuesses++;
+    counterDisplay.textContent = `Correct Guesses: ${correctGuesses}`;
+    makeVisible(targetMeshName);
     changeCountry();
   } else {
     console.log("Oops! That's not the correct country.");
@@ -214,6 +300,23 @@ button.addEventListener("click", () => {
 
   // Optionally, clear the text field after checking
   textField.value = "";
+});
+
+// Button to stop rotation
+stopBtn.addEventListener("click", () => {
+  isRotating = false;
+  if (targetMesh) {
+    targetMesh.rotation.z = 0;
+  }
+});
+
+// Button to show population
+populationBtn.addEventListener("click", async () => {
+  const countryInfo = await fetchCountryInfo(meshToCountry[targetMeshName]);
+
+  if (countryInfo) {
+    console.log("Population:", countryInfo["population"]);
+  }
 });
 
 function changeCountry() {
@@ -253,12 +356,24 @@ function changeCountry() {
 
         // Adjust position to center the mesh in the scene
         targetMesh.position.sub(center);
-        targetMesh.position.set(0, 0, 0); // Center on the scene
+        targetMesh.position.set(0, 0.3, 0); // Center on the scene
         scene.add(targetMesh);
 
         console.log("Target mesh centered:", targetMesh.name);
+
+        isRotating = true;
       } else {
         child.visible = false; // Hide other meshes
+      }
+    }
+  });
+}
+
+function makeVisible(meshName) {
+  worldMap.traverse((child) => {
+    if (child.isMesh) {
+      if (child.name === meshName) {
+        child.visible = true;
       }
     }
   });
@@ -281,12 +396,13 @@ function animate() {
   );
 
   // Rotate the mesh if it exists
-  if (targetMesh) {
+  if (targetMesh && isRotating) {
     targetMesh.rotation.z += 0.005; // Rotate around the Y-axis
   }
 
   // Update the text field position
   updateUIPosition();
+  updateCounterPosition();
 
   renderer.render(scene, camera);
 }
