@@ -59,7 +59,7 @@ const loader = new GLTFLoader();
 
 // Load the glTF model
 loader.load(
-  "assets/worldmap/scene.gltf",
+  "./assets/worldmap/scene.gltf",
   (gltf) => {
     allMeshes = gltf.scene;
     changeCountry();
@@ -73,7 +73,7 @@ loader.load(
 );
 
 loader.load(
-  "assets/worldmap/scene.gltf",
+  "./assets/worldmap/scene.gltf",
   (gltf) => {
     worldMap = gltf.scene;
     worldMap.position.set(4, 0, 5);
@@ -98,7 +98,7 @@ loader.load(
 
 // Load arrow
 loader.load(
-  "assets/jumpboost_arrow/scene.gltf",
+  "./assets/jumpboost_arrow/scene.gltf",
   (gltf) => {
     console.log(gltf);
     arrow = gltf.scene;
