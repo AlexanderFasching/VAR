@@ -9,5 +9,6 @@
   "scripts": {
     "build": "vite build",
     "deploy": "gh-pages -d dist"
-  }
+  },
+  "homepage": "https://<your-username>.github.io/<repository-name>"
 }
